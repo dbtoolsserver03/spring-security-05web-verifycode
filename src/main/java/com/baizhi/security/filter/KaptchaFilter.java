@@ -1,21 +1,23 @@
 package com.baizhi.security.filter;
 
 
-import org.springframework.security.authentication.AuthenticationServiceException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import java.io.IOException;
+
 import org.springframework.util.ObjectUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.baizhi.security.exception.KaptchaNotMatchException;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 //自定义验证码的 filter
-public class KaptchaFilter extends UsernamePasswordAuthenticationFilter {
+public class KaptchaFilter extends OncePerRequestFilter {
 
-    private static final String FORM_KAPTCHA_KEY = "kaptcha";
+
+	private static final String FORM_KAPTCHA_KEY = "kaptcha";
 
     private String kaptchaParameter = FORM_KAPTCHA_KEY;
 
@@ -27,19 +29,36 @@ public class KaptchaFilter extends UsernamePasswordAuthenticationFilter {
         this.kaptchaParameter = kaptchaParameter;
     }
 
-    @Override
-    public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
-        if (!request.getMethod().equals("POST")) {
-            throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
-        }
-        //1.从请求中获取验证码
-        String verifyCode = request.getParameter(getKaptchaParameter());
-        //2.与 session 中验证码进行比较
-        String sessionVerifyCode = (String) request.getSession().getAttribute("kaptcha");
-        if (!ObjectUtils.isEmpty(verifyCode) && !ObjectUtils.isEmpty(sessionVerifyCode) &&
-                verifyCode.equalsIgnoreCase(sessionVerifyCode)) {
-            return super.attemptAuthentication(request, response);
-        }
-        throw new KaptchaNotMatchException("验证码不匹配!");
-    }
+	@Override
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+		
+		
+		// 必须是登录的post请求才能进行验证，其他的直接放行
+        if(request.getRequestURI().endsWith("doLogin")) {
+        	
+            //1.从请求中获取验证码
+            String verifyCode = request.getParameter(getKaptchaParameter());
+            //2.与 session 中验证码进行比较
+            String sessionVerifyCode = (String) request.getSession().getAttribute("kaptcha");
+            if (!ObjectUtils.isEmpty(verifyCode) && !ObjectUtils.isEmpty(sessionVerifyCode) &&
+                    verifyCode.equalsIgnoreCase(sessionVerifyCode)) {
+
+            } else {
+            	 throw new KaptchaNotMatchException("验证码不匹配!");
+            }
+           
+        } 
+        		
+     	//通过校验，就放行
+        filterChain.doFilter(request,response);
+        		
+//        if (!request.getMethod().equals("POST")) {
+//            throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
+//        }
+
+        
+	
+		
+	}
 }
